@@ -3,14 +3,20 @@ import { Link, Outlet, useParams } from "react-router-dom";
 import Header from "../Header.jsx";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { deleteEvent, fetchEvent, queryClient } from "../../util/http.js";
+import { useState } from "react";
+import Modal from "../UI/Modal.jsx";
 export default function EventDetails() {
+  const [isDeleting, setIsDeleting] = useState(false);
   const params = useParams();
-  const { mutate } = useMutation({
+  const { mutate} = useMutation({
     mutationFn: deleteEvent,
-    onSuccess: () =>{
-      queryClient.invalidateQueries({queryKey: ['events']});
-      navigate("/events");
-    }
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['events'],
+        refetchType: 'none',
+      });
+      navigate('/events');
+    },
   });
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["events", params.id],
@@ -19,9 +25,15 @@ export default function EventDetails() {
   function handleDelete() {
     mutate({ id: params.id });
   }
+  function handleStartDelete() {
+    setIsDeleting(true);
+  }
+  function handleStopDelete() {
+    setIsDeleting(false);
+  }
   let content;
   if (isPending) {
-    content = <div> Loading content...</div>;
+    content = "Loading content...";
   }
   if (isError) {
     content = <div>{error.info?.message || "error loading data"}</div>;
@@ -33,7 +45,7 @@ export default function EventDetails() {
         <header>
           <h1>{data.title}</h1>
           <nav>
-            <button onClick={handleDelete}>Delete</button>
+            <button onClick={handleStartDelete}>Delete</button>
             <Link to="edit">Edit</Link>
           </nav>
         </header>
@@ -52,6 +64,11 @@ export default function EventDetails() {
   }
   return (
     <>
+      {isDeleting && <Modal>
+        <p>you sure about deleting this?</p>
+        <button onClick={handleStopDelete}>Cancel</button>
+        <button onClick={handleDelete}>Delete</button>
+      </Modal>}
       <Outlet />
       <Header>
         <Link to="/events" className="nav-item">
