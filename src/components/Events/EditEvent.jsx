@@ -1,27 +1,44 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import Modal from '../UI/Modal.jsx';
-import EventForm from './EventForm.jsx';
+import Modal from "../UI/Modal.jsx";
+import EventForm from "./EventForm.jsx";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { fetchEvent, updateEvent } from "../../util/http.js";
 
 export default function EditEvent() {
   const navigate = useNavigate();
+  const params = useParams();
 
-  function handleSubmit(formData) {}
+  const { data, isPending, isError } = useQuery({
+    queryFn: ({ signal }) => fetchEvent({ signal, id: params.id }),
+    queryKey: ['events', params.id]
+  });
+
+  const {mutate} = useMutation({
+    mutationFn: updateEvent,
+  })
+
+  function handleSubmit(formData) {
+    mutate({id:params.id, event: formData});
+    navigate("../");
+  }
 
   function handleClose() {
-    navigate('../');
+    navigate("../");
   }
 
   return (
     <Modal onClose={handleClose}>
-      <EventForm inputData={null} onSubmit={handleSubmit}>
+      {isPending && <p>Loading...</p>}
+      {isError && <p>Error occured !</p>}
+      {!isPending && !isError && data && <EventForm inputData={data} onSubmit={handleSubmit}>
         <Link to="../" className="button-text">
           Cancel
         </Link>
         <button type="submit" className="button">
           Update
         </button>
-      </EventForm>
+      </EventForm>}
     </Modal>
   );
 }
