@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import Modal from "../UI/Modal.jsx";
 import EventForm from "./EventForm.jsx";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchEvent, updateEvent } from "../../util/http.js";
+import { fetchEvent, updateEvent, queryClient } from "../../util/http.js";
 
 export default function EditEvent() {
   const navigate = useNavigate();
@@ -11,15 +11,28 @@ export default function EditEvent() {
 
   const { data, isPending, isError } = useQuery({
     queryFn: ({ signal }) => fetchEvent({ signal, id: params.id }),
-    queryKey: ['events', params.id]
+    queryKey: ["events", params.id],
   });
 
-  const {mutate} = useMutation({
+  const { mutate } = useMutation({
     mutationFn: updateEvent,
-  })
+    onMutate: async (data) => {
+      const newEvent = data.event;
+      await queryClient.cancelQueries({ queryKey: ["events", params.id] });
+      const oldEvent = queryClient.getQueryData(["events", params.id]);
+      queryClient.setQueryData(["events", params.id], newEvent);
+      return { oldEvent };
+    },
+    onError: (error, data, context) => {
+      queryClient.setQueryData(["events", params.id], context.oldEvent);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries(["events", params.id])
+    }
+  });
 
   function handleSubmit(formData) {
-    mutate({id:params.id, event: formData});
+    mutate({ id: params.id, event: formData });
     navigate("../");
   }
 
@@ -31,14 +44,16 @@ export default function EditEvent() {
     <Modal onClose={handleClose}>
       {isPending && <p>Loading...</p>}
       {isError && <p>Error occured !</p>}
-      {!isPending && !isError && data && <EventForm inputData={data} onSubmit={handleSubmit}>
-        <Link to="../" className="button-text">
-          Cancel
-        </Link>
-        <button type="submit" className="button">
-          Update
-        </button>
-      </EventForm>}
+      {!isPending && !isError && data && (
+        <EventForm inputData={data} onSubmit={handleSubmit}>
+          <Link to="../" className="button-text">
+            Cancel
+          </Link>
+          <button type="submit" className="button">
+            Update
+          </button>
+        </EventForm>
+      )}
     </Modal>
   );
 }
